@@ -112,6 +112,20 @@ def test_log_outcome_invalid():
     assert r.status_code == 422
 
 
+def test_validate_offer_typo_total_amounts():
+    """Claude sometimes sends total_amounts instead of total_amount."""
+    r = client.post("/validate-offer", json={
+        "total_amounts": 1000,
+        "payments": [1000],
+        "cadence": "lump_sum",
+        "span_weeks": "",
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert data["decision"] == "ACCEPT"
+    assert data["tier"] == "FULL_PAYMENT"
+
+
 def test_call_ended_with_agreement():
     client.post("/log-agreement", json={
         "call_id": "test-call-end-1",

@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from validation import ProposedOffer, validate_offer, Decision
 
@@ -104,17 +104,30 @@ def get_db():
 
 class OfferPayload(BaseModel):
     call_id: Optional[str] = None
-    total_amount: float
+    total_amount: Optional[float] = None
+    total_amounts: Optional[float] = None  # common LLM typo
     payments: List[float]
     cadence: str = "lump_sum"
-    span_weeks: float = 0.0
+    span_weeks: Optional[float] = 0.0
+
+    @field_validator("span_weeks", mode="before")
+    @classmethod
+    def coerce_span_weeks(cls, v):
+        if v is None or v == "":
+            return 0.0
+        return v
+
+    @property
+    def resolved_total(self) -> float:
+        return self.total_amount or self.total_amounts or 0.0
 
 
 @app.post("/validate-offer")
 def validate_offer_endpoint(payload: OfferPayload):
-    logger.info("validate-offer call_id=%s total=%.2f payments=%s", payload.call_id, payload.total_amount, payload.payments)
+    total = payload.resolved_total
+    logger.info("validate-offer call_id=%s total=%.2f payments=%s", payload.call_id, total, payload.payments)
     offer = ProposedOffer(
-        total_amount=payload.total_amount,
+        total_amount=total,
         payments=payload.payments,
         cadence=payload.cadence,
         span_weeks=payload.span_weeks,
