@@ -1,0 +1,94 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "validate_offer",
+      "description": "REQUIRED before accepting, rejecting, or countering ANY payment proposal from the consumer -- whether it's their first offer or a revised one. You must never decide yourself whether an amount or schedule is acceptable. Call this with exactly what the consumer proposed (or what you are about to propose to them), and relay the returned decision verbatim in spirit.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "call_id": { "type": "string", "description": "Current call id, from {{call.id}}" },
+          "total_amount": { "type": "number", "description": "Total dollar amount the consumer is proposing to pay in total." },
+          "payments": {
+            "type": "array",
+            "items": { "type": "number" },
+            "description": "Ordered list of individual payment amounts that sum to total_amount. Single value for a lump sum, two values for downpayment+final, up to 4 for a plan."
+          },
+          "cadence": {
+            "type": "string",
+            "enum": ["lump_sum", "biweekly", "weekly", "monthly"],
+            "description": "How often payments after the first would occur."
+          },
+          "span_weeks": {
+            "type": "number",
+            "description": "Total weeks from first to last payment. 0 for lump sum."
+          }
+        },
+        "required": ["total_amount", "payments", "cadence"]
+      }
+    },
+    "server": { "url": "https://YOUR-BACKEND-URL/validate-offer" }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "check_compliance",
+      "description": "Call this with the exact sentence you are about to say ANY time it references a consequence, a deadline/urgency, legal action, credit impact, or anything the consumer might perceive as a threat. If allowed=false, do not say the original sentence -- rephrase using only the instruction returned and try again silently before speaking.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "call_id": { "type": "string" },
+          "text": { "type": "string", "description": "The exact sentence you are about to say to the consumer." }
+        },
+        "required": ["text"]
+      }
+    },
+    "server": { "url": "https://YOUR-BACKEND-URL/check-compliance" }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "log_agreement",
+      "description": "Call this exactly once, only after validate_offer has returned decision=ACCEPT and the consumer has verbally confirmed they agree to those exact terms. This finalizes and records the agreement.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "call_id": { "type": "string" },
+          "tier": {
+            "type": "string",
+            "enum": ["FULL_PAYMENT", "DOWNPAYMENT_PLUS_ONE", "SETTLEMENT", "PAYMENT_PLAN"]
+          },
+          "total_amount": { "type": "number" },
+          "payments": { "type": "array", "items": { "type": "number" } },
+          "cadence": { "type": "string", "enum": ["lump_sum", "biweekly", "weekly", "monthly"] }
+        },
+        "required": ["tier", "total_amount", "payments", "cadence"]
+      }
+    },
+    "server": { "url": "https://YOUR-BACKEND-URL/log-agreement" }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "log_outcome",
+      "description": "Call this when the consumer disputes the debt or requests to stop being contacted (DNC). Call it BEFORE ending the call so the outcome is recorded. Do not call this for normal call endings -- only for disputes and DNC requests.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "call_id": { "type": "string", "description": "Current call id, from {{call.id}}" },
+          "outcome": {
+            "type": "string",
+            "enum": ["DISPUTE", "DNC_REQUEST"],
+            "description": "DISPUTE if the consumer says the debt is not theirs or asks for verification. DNC_REQUEST if they ask you to stop calling."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Brief summary of what the consumer said."
+          }
+        },
+        "required": ["call_id", "outcome"]
+      }
+    },
+    "server": { "url": "https://YOUR-BACKEND-URL/log-outcome" }
+  }
+]
