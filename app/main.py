@@ -1,22 +1,3 @@
-"""
-Corafone collections-agent backend.
-
-Endpoints called BY Vapi (voice platform) during/after the call:
-
-  POST /validate-offer   <- tool call mid-conversation
-  POST /check-compliance <- guardrail before risky sentences
-  POST /log-agreement    <- record final agreed terms
-  POST /log-outcome      <- record dispute/DNC outcomes
-  POST /call-ended       <- Vapi end-of-call webhook
-  GET  /health           <- liveness check
-
-Run locally:
-  pip install fastapi uvicorn
-  uvicorn main:app --reload --port 8000
-
-Deploy: Railway / Render, see README.md.
-"""
-
 import json
 import logging
 import os
@@ -30,18 +11,17 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, field_validator
 
-from validation import ProposedOffer, validate_offer, Decision
+from validation import ProposedOffer, validate_offer
 
 DB_PATH = Path(os.environ.get("DATABASE_PATH", str(Path(__file__).parent / "corafone.db")))
 
 log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
-logging.basicConfig(level=getattr(logging, log_level, logging.INFO), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logging.basicConfig(
+    level=getattr(logging, log_level, logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 logger = logging.getLogger("corafone")
 
-
-# --------------------------------------------------------------------------- #
-# App lifecycle & storage
-# --------------------------------------------------------------------------- #
 
 def _init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -98,14 +78,12 @@ def get_db():
         conn.close()
 
 
-# --------------------------------------------------------------------------- #
-# /validate-offer
-# --------------------------------------------------------------------------- #
+# --- /validate-offer ---
 
 class OfferPayload(BaseModel):
     call_id: Optional[str] = None
     total_amount: Optional[float] = None
-    total_amounts: Optional[float] = None  # common LLM typo
+    total_amounts: Optional[float] = None
     payments: List[float]
     cadence: str = "lump_sum"
     span_weeks: Optional[float] = 0.0
@@ -142,9 +120,7 @@ def validate_offer_endpoint(payload: OfferPayload):
     }
 
 
-# --------------------------------------------------------------------------- #
-# /check-compliance
-# --------------------------------------------------------------------------- #
+# --- /check-compliance ---
 
 BANNED_PATTERNS = [
     r"\bjail\b", r"\barrest(ed)?\b", r"\bsue\b", r"\blawsuit\b", r"\bcourt\b",
@@ -186,9 +162,7 @@ def check_compliance(payload: ComplianceCheckPayload):
     return {"allowed": True}
 
 
-# --------------------------------------------------------------------------- #
-# /log-agreement
-# --------------------------------------------------------------------------- #
+# --- /log-agreement ---
 
 class AgreementPayload(BaseModel):
     call_id: Optional[str] = None
@@ -210,13 +184,11 @@ def log_agreement(payload: AgreementPayload):
     return {"status": "logged"}
 
 
-# --------------------------------------------------------------------------- #
-# /log-outcome
-# --------------------------------------------------------------------------- #
+# --- /log-outcome ---
 
 class OutcomePayload(BaseModel):
     call_id: str
-    outcome: str  # DISPUTE | DNC_REQUEST
+    outcome: str
     notes: Optional[str] = None
 
 
@@ -234,29 +206,25 @@ def log_outcome(payload: OutcomePayload):
     return {"status": "logged", "outcome": payload.outcome}
 
 
-# --------------------------------------------------------------------------- #
-# /call-ended  (Vapi end-of-call-report webhook)
-# --------------------------------------------------------------------------- #
+# --- /call-ended (Vapi webhook) ---
 
 @app.post("/call-ended")
 def call_ended(payload: dict):
-    """
-    Vapi sends a broad payload here; we pull out what we need.
-    See: https://docs.vapi.ai/server-url  (server messages -> end-of-call-report)
-    """
     message = payload.get("message", payload)
     call_id = (message.get("call") or {}).get("id") or message.get("callId")
     transcript = message.get("transcript") or message.get("artifact", {}).get("transcript", "")
     ended_reason = message.get("endedReason", "unknown")
 
-    # Determine outcome by checking if an agreement or outcome was already logged
     outcome = "NO_AGREEMENT"
     with get_db() as conn:
         row = conn.execute("SELECT tier FROM agreements WHERE call_id = ? LIMIT 1", (call_id,)).fetchone()
         if row:
             outcome = f"AGREED_{row[0]}"
         else:
-            row = conn.execute("SELECT outcome FROM calls WHERE call_id = ? AND outcome IN ('DISPUTE', 'DNC_REQUEST') LIMIT 1", (call_id,)).fetchone()
+            row = conn.execute(
+                "SELECT outcome FROM calls WHERE call_id = ? AND outcome IN ('DISPUTE', 'DNC_REQUEST') LIMIT 1",
+                (call_id,),
+            ).fetchone()
             if row:
                 outcome = row[0]
 

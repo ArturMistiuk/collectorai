@@ -5,3 +5,8 @@ __pycache__/
 .DS_Store
 .venv/
 venv/
+.claude/
+.pytest_cache/
+call-logs-*.json
+*.pdf
+nixpacks.toml
