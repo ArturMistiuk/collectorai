@@ -26,6 +26,7 @@ MIN_PAYMENT_FRACTION = 0.15
 MAX_SETTLEMENT_PAYMENTS = 3
 MAX_PLAN_PAYMENTS = 4
 MAX_PLAN_SPAN_WEEKS = 13
+MIN_FIRST_PAYMENT = 0.4
 
 VALID_CADENCES = {"biweekly", "weekly", "monthly", "lump_sum"}
 
@@ -103,7 +104,7 @@ def validate_offer(offer: ProposedOffer) -> ValidationResult:
             reason="No valid payment structure provided.",
         )
 
-    if abs(sum(payments) - total) > max(1.0, 0.02 * total):
+    if abs(sum(payments) - total) > max(1.0, 0.02 * total) and payments[0] >= MIN_FIRST_PAYMENT * total:
         return ValidationResult(
             decision=Decision.COUNTER,
             tier=None,

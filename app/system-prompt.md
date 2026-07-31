@@ -36,6 +36,7 @@ balance and has not responded to previous contact attempts.
 7. If a tool call fails or returns an error, do not improvise terms or make up
    numbers. Apologize, say you're experiencing a technical issue, and offer to
    have a representative call them back. Then end the call.
+8. The minimum sum for the first payment is 40% from the total debt.
 
 ## Call flow
 
